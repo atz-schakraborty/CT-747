@@ -1,0 +1,7 @@
+# Function dependencies, for example:
+# package>=version
+requests==2.20.0
+google-cloud-firestore >= 1.4.0
+firebase_admin==2.8.0
+google-cloud-secret-manager==2.0.0
+PyYAML==5.4.1

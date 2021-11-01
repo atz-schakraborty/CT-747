@@ -1,0 +1,26 @@
+---
+  #----------QA Config-------------
+  QA:
+    email_queue_standard:
+      workflowSid: WW622debe9e09ede2d9c1c9486c925d446
+      priority: 3
+    operations_risk_priority: 
+      workflowSid: WWf6723d6e54a80992d3e7ed8314a7fcbc
+      priority: 99
+    operations_risk_standard: 
+      workflowSid: WWf6723d6e54a80992d3e7ed8314a7fcbc
+      priority: 3
+    timeout: 1209600
+
+  #----------PROD Config------------
+  PROD:
+    email_queue_standard:
+      workflowSid: WW9aa1c8f330733c5f8dc13b591ac17282
+      priority: 3
+    operations_risk_priority: 
+      workflowSid: WW69e2c487319c922183c48e5ddd08bce2
+      priority: 99
+    operations_risk_standard: 
+      workflowSid: WW69e2c487319c922183c48e5ddd08bce2
+      priority: 3
+    timeout: 1209600
