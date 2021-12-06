@@ -1,10 +1,8 @@
 import logging
 from datetime import datetime
 from case import Case
-import pytz
 import firebase_admin
 import main
-from pytz import timezone
 from firebase_admin import credentials
 from firebase_admin import firestore
 
@@ -55,20 +53,20 @@ def add_case(db, request, correlation_id):
             u'created_timestamp': request.get('created_timestamp'),
             u'last_updated_timestamp': request.get('last_updated_timestamp'),
             u'status' : request.get('status'),
-            u'language' : request.get('language'),
+            u'language' : request.get('language', None),
             u'channel' : request.get('channel'),
-            u'agent_id' : request.get('agent_id'),
-            u'priority' : request.get('priority'),
-            u'escalation_code' : request.get('escalation_code'),
-            u'from_email' : request.get('from_email'),
-            u'external_id' : request.get('external_id'),
-            u'object_id' : request.get('object_id'),
-            u'cdc_customer_id' : request.get('cdc_customer_id'),
-            u'name' : request.get('name'),
-            u'email_subject' : request.get('email_subject'),
-            u'operations_investigation' : request.get('operations_investigation'),
-            u'mpc_decision' : request.get('mpc_decision'),
-            u'investigation_transfer_timestamp' : request.get('investigation_transfer_timestamp'),
+            u'agent_id' : request.get('agent_id', None),
+            u'priority' : request.get('priority', None),
+            u'escalation_code' : request.get('escalation_code', None),
+            u'from_email' : request.get('from_email', None),
+            u'external_id' : request.get('external_id', None),
+            u'object_id' : request.get('object_id', None),
+            u'cdc_customer_id' : request.get('cdc_customer_id', None),
+            u'name' : request.get('name', None),
+            u'email_subject' : request.get('email_subject', None),
+            u'operations_investigation' : request.get('operations_investigation', None),
+            u'mpc_decision' : request.get('mpc_decision', None),
+            u'investigation_transfer_timestamp' : request.get('investigation_transfer_timestamp', None),
             u'twilio_task_created' : request.get('twilio_task_created'),
             u'twilio_task_sid' : request.get('twilio_task_sid'),
             u'twilio_task_status' : request.get('twilio_task_status'),
@@ -137,3 +135,16 @@ def create_firestore_document(attributes, case, task_created, existing_case, twi
             document['investigation_transfer_timestamp'] = existing_case.investigation_transfer_timestamp
             
     return document
+
+'''
+def update_case(db, case_number, case, correlation_id):
+    try:
+        doc_ref = db.collection(u'service-cloud-cases').document(case_number)
+
+        #Update the status in case of resolved cases
+        doc_ref.update({u'last_updated_timestamp' : datetime.now(),
+                        u'status' : case.status
+        })
+    except Exception as e:
+        logging.error(correlation_id + " - Error updating task SID in Firestore for case: " + case_id + " Error: " + format(str(e)))
+'''

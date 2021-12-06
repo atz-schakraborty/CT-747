@@ -55,13 +55,15 @@ def pubsub_to_caseMessage(event, context):
             #Case status is not resolved or closed
             existing_case = firestore_functions.search_case(db, case_number, correlation_id) #Search if the case is present in Firestore
             request_body = {}
-            employee_id = ''
-            attributes = create_attributes(sc_case_message, existing_case)
+            #employee_id = ''
+            attributes = create_attributes(sc_case_message)
 
+            '''
             if sc_case_message['ProcessorPartyID'] != "":
                 #If Processor Party ID is present in the payload, query the corresponding employee ID
                 employee_id = get_employeeId(sc_case_message['ProcessorPartyID'])
                 attributes['agent_ID'] = employee_id
+            '''
             
             if create_task(sc_case_message, existing_case):     
 
@@ -165,7 +167,7 @@ def create_task(message, case):
     #Check if conditions are valid to create a new task in Twilio
     case_language = ''
     case_status = ''
-    created_timestamp = ''
+    investigation_transfer_timestamp = ''
     global queue_details_dict
 
     if case is not None:
@@ -173,19 +175,19 @@ def create_task(message, case):
             case_language = case.language
         if hasattr(case, 'status'):
             case_status = case.status
-        created_timestamp = case.created_timestamp
+        investigation_transfer_timestamp = case.investigation_transfer_timestamp
         twilio_task_flag = case.twilio_task_created #Check the last status of twilio task created flag
+    '''
     else:
         #This is needed if a case is reopened after resolved, case is deleted from Firestore 
         #created_timestamp needs to be read from the message and converted from string to datetime for comparison
         created_date_str = message['CreationDateTime'] if 'CreationDateTime' in message else None
-        created_timestamp = convertStringToTimestamp(created_date_str)
-
+        investigation_transfer_timestamp = convertStringToTimestamp(created_date_str) #Need to update this logic later
+    '''
     request_status = status_map(message['ServiceRequestUserLifeCycleStatusCode']) if 'ServiceRequestUserLifeCycleStatusCode' in message else None
     request_language = language_map(message['CaseLanguage_KUT']) if 'CaseLanguage_KUT' in message else None
     channel = message['DataOriginTypeCode'] if 'DataOriginTypeCode' in message else None
     escalation = message['EscalationStatusCode'] if 'EscalationStatusCode' in message else None
-    priority = message['ServicePriorityCode'] if 'ServicePriorityCode' in message else None
     investigation = message['Investigation_KUT'] if 'Investigation_KUT' in message else None   
     now = datetime.now(tz=pytz.utc)
 
@@ -229,18 +231,26 @@ def create_task(message, case):
             return False
         if investigation == '121':
             #If MPC Claim, COA decided
-            if created_timestamp <= (now-timedelta(hours=int(mpc_wait_time))):
-            #If case creation is more than 48 hours, create the task in twilio immediately
-            #These will be excluded from the batch job
+            if investigation_transfer_timestamp and investigation_transfer_timestamp is not None:
+                #If investigation transfer timestamp is present
+                if investigation_transfer_timestamp <= (now-timedelta(hours=int(mpc_wait_time))):
+                    #If case transfer to risk is more than 48 hours, create the task in twilio immediately
+                    #These will be excluded from the batch job
+                    queue_details_dict = getPropertyValue('operations_risk_standard')
+                    return True
+                else:
+                    #If not 48 hours from when case transferred to Risk, 
+                    #don't create task in Twilio, task will be created by the scheduler
+                    update_twilio_task_created(False)
+                    return False
+            else:
+                #No investigation transfer timestamp, might be the case is reopen after resolved
                 queue_details_dict = getPropertyValue('operations_risk_standard')
                 return True
-            else:
-                #If not 48 hours from creation, don't create task in Twilio, task will be created by the scheduler
-                update_twilio_task_created(False)
-                return False
         else:
             queue_details_dict = getPropertyValue('email_queue_standard')
             return True
+
 
 def convertStringToTimestamp(date_string):
     #Convert datetime string to aware date object
@@ -253,6 +263,7 @@ def convertStringToTimestamp(date_string):
         return converted_timestamp_pst
     except ValueError as val:
         logging.warning("Error: {}".format(str(val)))
+
 
 def get_employeeId(processor_party_ID):
     #Call the Report API to get the employee ID for corresponding Business Partner ID/ Processor party ID. 
@@ -286,7 +297,7 @@ def get_employeeId(processor_party_ID):
         logging.warning(correlation_id + " - Error getting Employee ID. Error: {}".format(str(e)))
 
 
-def create_attributes(message, case):
+def create_attributes(message):
     '''
         Creating the custom attributes field in the twilio task message payload
     '''
@@ -301,7 +312,7 @@ def create_attributes(message, case):
         if interactions > 0:
             attributes_dict['from_email'] = message['ServiceRequestInteractions'][0]['ServiceRequestInteractionInteractions'][0]['FromEmailURI']
     email_subject = message['Name'] if 'Name' in message else None
-    parsed_email_subject = email_subject.replace(' & ', ' and ') #CT-593
+    parsed_email_subject = email_subject.replace(' & ', ' and ')
     attributes_dict['email_subject'] = parsed_email_subject
     attributes_dict['reported_date'] = message['CreationDateTime'] if 'CreationDateTime' in message else None
     attributes_dict['language'] = language_map(message['CaseLanguage_KUT']) if 'CaseLanguage_KUT' in message else None
